@@ -1,0 +1,8 @@
+*.txt
+*.csv
+*.md
+!README.md
+*.py
+test*
+*.xlsx
+./新建文件夹
