@@ -131,29 +131,6 @@ logging:
 - 减小缓冲区: `buffer_size: 1048576`
 - 减少线程数: `thread_count: 2`
 
-## 输出格式示例
-### 默认格式
-```text
-[+] 计算 file1.zip...
-    MD5:    D41D8CD98F00B204E9800998ECF8427E
-    SHA256: 6A3B92293E7B42B93C7E2D2E3F4A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2
-```
-### JSON格式
-```json
-{
-  "file": "file2.txt",
-  "hashes": {
-    "SHA1": "A1B2C3D4E5F6...",
-    "BLAKE2b": "1A2B3C4D5E6F..."
-  },
-  "timestamp": "2024-03-12T15:30:00Z"
-}
-```
-### CSV格式
-```text
-file,md5,sha1,sha256,blake2b
-file1.txt,D41D8CD98F00B204E9800998ECF8427E,A1B2C3D4E5F6...,1A2B3C4D5E6F...,1A2B3C4D5E6F...
-```
 ## 测试说明
 ### 运行测试
 
