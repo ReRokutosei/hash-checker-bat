@@ -59,6 +59,6 @@ exclude_patterns:
 
 # 日志配置
 logging:
-  enabled: true
+  enabled: false
   level: "INFO"
   file: "hash_calculator.log"
