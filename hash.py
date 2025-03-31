@@ -301,11 +301,73 @@ class HashCalculator:
                     for mismatch in comp['mismatches']:
                         print(mismatch)
 
+    def parse_hash_file(self, hash_file: str) -> List[Dict[str, str]]:
+        """解析哈希校验文件
+        返回格式: [{'filename': str, 'hash': str, 'binary': bool}, ...]
+        """
+        results = []
+        target_file = os.path.splitext(hash_file)[0]
+        
+        try:
+            with open(hash_file, 'r', encoding='utf-8') as f:
+                lines = [line.strip() for line in f if line.strip()]
+                
+            # 处理单行情况
+            if len(lines) == 1:
+                line = lines[0]
+                # 情况1: 仅包含哈希值
+                if ' ' not in line:
+                    results.append({
+                        'filename': target_file,
+                        'hash': line.lower(),
+                        'binary': False
+                    })
+                else:
+                    # 情况2: "[hash] *filename" 或 "[hash] filename"
+                    hash_value, *name_parts = line.split()
+                    filename = ' '.join(name_parts)
+                    if filename.startswith('*'):
+                        filename = filename[1:]  # 去除星号
+                        binary = True
+                    else:
+                        binary = False
+                    
+                    results.append({
+                        'filename': filename,
+                        'hash': hash_value.lower(),
+                        'binary': binary
+                    })
+            # 处理多行情况
+            else:
+                for line in lines:
+                    if ' ' in line:
+                        hash_value, *name_parts = line.split()
+                        filename = ' '.join(name_parts)
+                        binary = filename.startswith('*')
+                        if binary:
+                            filename = filename[1:]
+                        
+                        results.append({
+                            'filename': filename,
+                            'hash': hash_value.lower(),
+                            'binary': binary
+                        })
+        
+        except Exception as e:
+            logging.error(f"解析哈希文件 {hash_file} 时出错: {e}")
+            raise
+            
+        return results
+
     def auto_verify_files(self) -> None:
         """自动验证模式"""
+        # 获取所有可用的哈希算法
+        all_algorithms = {name.upper() for name in hashlib.algorithms_available}
+        temp_hash_funcs = {}
+        
         # 获取当前目录下所有哈希文件
         hash_files = []
-        for algo in self.hash_funcs.keys():
+        for algo in all_algorithms:
             hash_files.extend(glob.glob(f"*.{algo.lower()}"))
         
         if not hash_files:
@@ -317,35 +379,50 @@ class HashCalculator:
         
         for hash_file in hash_files:
             algo = os.path.splitext(hash_file)[1][1:].upper()
+            
+            # 如果算法被禁用，临时启用它
             if algo not in self.hash_funcs:
-                continue
-                
-            target_file = os.path.splitext(hash_file)[0]
-            if not os.path.exists(target_file):
-                print(f"⚠️ 未找到文件: {target_file}")
-                continue
-                
-            try:
-                # 读取校验值
-                with open(hash_file, 'r') as f:
-                    expected_hash = f.read().strip()
-                
-                # 计算实际哈希值
-                actual_hash = self.calculate_file_hash(target_file)[algo]
-                
-                if actual_hash == expected_hash:
-                    print(f"✅ {target_file} ({algo}) 验证通过")
-                    success_count += 1
+                if hasattr(hashlib, algo.lower()):
+                    temp_hash_funcs[algo] = getattr(hashlib, algo.lower())
                 else:
-                    print(f"❌ {target_file} ({algo}) 验证失败")
-                    print(f"预期: {expected_hash}")
-                    print(f"实际: {actual_hash}")
-                    fail_count += 1
+                    print(f"⚠️ 不支持的哈希算法: {algo}")
+                    continue
+            
+            try:
+                # 解析哈希文件
+                hash_entries = self.parse_hash_file(hash_file)
+                
+                for entry in hash_entries:
+                    if not os.path.exists(entry['filename']):
+                        print(f"⚠️ 未找到文件: {entry['filename']}")
+                        fail_count += 1
+                        continue
                     
+                    # 计算实际哈希值
+                    hash_func = self.hash_funcs.get(algo) or temp_hash_funcs.get(algo)
+                    actual_hash = hash_func()
+                    
+                    with open(entry['filename'], 'rb') as f:
+                        while chunk := f.read(self.config['performance']['buffer_size']):
+                            actual_hash.update(chunk)
+                    
+                    actual_value = actual_hash.hexdigest().lower()
+                    
+                    if actual_value == entry['hash']:
+                        print(f"✅ {entry['filename']} ({algo}) 验证通过")
+                        success_count += 1
+                    else:
+                        print(f"❌ {entry['filename']} ({algo}) 验证失败")
+                        print(f"预期: {entry['hash']}")
+                        print(f"实际: {actual_value}")
+                        fail_count += 1
+                        
             except Exception as e:
                 print(f"处理 {hash_file} 时出错: {e}")
                 fail_count += 1
         
+        # 清理临时哈希函数
+        temp_hash_funcs.clear()
         print(f"\n验证完成: 成功 {success_count}, 失败 {fail_count}")
 
     def format_output(self, filepath: str, hashes: Dict[str, str], output_format: str = "default") -> None:
