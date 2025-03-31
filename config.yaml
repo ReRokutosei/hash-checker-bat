@@ -8,16 +8,16 @@ performance:
 # 哈希算法配置
 algorithms:
   MD5:
-    enabled: true
+    enabled: false
     compare_format: "{filename}: {value}"
   SHA1:
-    enabled: true
+    enabled: false
     compare_format: "{filename}: {value}"
   SHA256:
-    enabled: true
+    enabled: false
     compare_format: "{filename}: {value}"
   SHA3_256:
-    enabled: true
+    enabled: false
     compare_format: "{filename}: {value}"
   BLAKE2b:
     enabled: true
