@@ -19,15 +19,39 @@ init()
 
 class HashCalculator:
     def __init__(self, config_path: str = "config.yaml"):
-        if not os.path.exists(config_path):
-            self.create_default_config(config_path)
-        self.config = self.load_config(config_path)
+        # 处理配置文件路径
+        self.config_path = self._resolve_config_path(config_path)
+        if not os.path.exists(self.config_path):
+            self.create_default_config(self.config_path)
+        self.config = self.load_config(self.config_path)
         if not self.validate_config(self.config):
             logging.warning("配置验证失败，使用默认配置")
             self.config = self.get_default_config()
         self.setup_logging()
         self.setup_algorithms()
         
+    def _resolve_config_path(self, config_path: str) -> str:
+        """解析配置文件路径"""
+        if os.path.isabs(config_path):
+            return config_path
+        
+        # 首先检查当前目录
+        if os.path.exists(config_path):
+            return os.path.abspath(config_path)
+            
+        # 然后检查用户目录
+        user_config = os.path.join(os.path.expanduser("~"), ".config", "hash", "config.yaml")
+        if os.path.exists(user_config):
+            return user_config
+            
+        # 最后检查程序所在目录
+        prog_config = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml")
+        if os.path.exists(prog_config):
+            return prog_config
+            
+        # 如果都不存在，使用用户目录
+        return user_config
+
     def validate_config(self, config: Any) -> bool:
         """验证配置是否有效"""
         if not isinstance(config, dict):
@@ -80,7 +104,11 @@ class HashCalculator:
         """创建默认配置文件"""
         try:
             config = self.get_default_config()
-            os.makedirs(os.path.dirname(config_path), exist_ok=True)
+            # 确保配置目录存在
+            config_dir = os.path.dirname(config_path)
+            if config_dir:  # 如果不是当前目录
+                os.makedirs(config_dir, exist_ok=True)
+                
             with open(config_path, 'w', encoding='utf-8') as f:
                 yaml.dump(config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
             logging.info(f"已创建默认配置文件: {config_path}")
@@ -209,27 +237,17 @@ class HashCalculator:
             print(f"\n处理完成，耗时: {elapsed:.2f} 秒")
 
 def main():
-    # 确保配置文件存在
-    default_config = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml")
-    if not os.path.exists(default_config):
-        try:
-            calculator = HashCalculator(default_config)
-        except Exception as e:
-            print(f"无法创建默认配置文件：{e}")
-            return
-
     if len(sys.argv) < 3:
         print("用法：")
         print("hash -i file           计算单个或多个文件的哈希值")
         print("hash -s file1 file2    比较两个或多个文件的哈希值")
         return
     
-    mode = sys.argv[1]
-    files = sys.argv[2:]
-    
-    calculator = HashCalculator()
-    
     try:
+        calculator = HashCalculator()
+        mode = sys.argv[1]
+        files = sys.argv[2:]
+        
         if mode == "-i":
             calculator.process_files(files, mode="info")
         elif mode == "-s":
@@ -238,6 +256,7 @@ def main():
             print("错误：无效的操作模式，请使用 -i 或 -s")
     except Exception as e:
         print(f"执行过程中出错：{e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
