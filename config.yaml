@@ -1,0 +1,39 @@
+# 性能配置
+performance:
+  async_mode: true          # 是否启用异步模式
+  buffer_size: 8388608      # 读取缓冲区大小(8MB)
+  use_mmap: true           # 是否使用mmap处理大文件
+  thread_count: 4          # 线程池大小
+
+# 哈希算法配置
+algorithms:
+  - MD5
+  - SHA1
+  - SHA256
+  - SHA3_256
+  - BLAKE2b
+
+# 输出配置
+output:
+  color: true              # 启用彩色输出
+  progress_bar: true       # 显示进度条
+  show_time: true         # 显示处理时间
+  format: "default"        # 输出格式(default/json/csv)
+
+# 文件处理
+file_handling:
+  recursive: false         # 是否递归扫描子目录
+  retry_count: 3          # 文件读取失败重试次数
+  ignore_errors: false    # 是否忽略错误继续执行
+
+# 排除模式
+exclude_patterns:
+  - "*.tmp"
+  - "*.temp"
+  - "~*"
+
+# 日志配置
+logging:
+  enabled: true
+  level: "INFO"
+  file: "hash_calculator.log"

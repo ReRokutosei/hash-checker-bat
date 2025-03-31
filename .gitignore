@@ -1,8 +1,8 @@
 *.txt
 *.csv
 *.md
+*.log
 !README.md
-gen.py
-test*
 *.xlsx
-./新建文件夹
+__pycache__/
+!requirements.txt
