@@ -6,3 +6,4 @@
 *.xlsx
 __pycache__/
 !requirements.txt
+算法.py

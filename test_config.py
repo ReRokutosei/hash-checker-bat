@@ -26,46 +26,65 @@ class ConfigTester:
         base_config = {
             'performance': {
                 'async_mode': [True, False],
-                'buffer_size': [1024*1024, 8*1024*1024],  # 1MB, 8MB
+                'buffer_size': [1024*1024, 8*1024*1024],
                 'use_mmap': [True, False],
                 'thread_count': [1, 4]
             },
-            'algorithms': [
-                ['MD5'], 
-                ['SHA256'], 
-                ['MD5', 'SHA256']
-            ],
-            'output': {
-                'format': ['default', 'json', 'csv']
+            'algorithms': {
+                'MD5': {'enabled': [True, False]},
+                'SHA1': {'enabled': [True]},
+                'SHA256': {'enabled': [True, False]}
+            },
+            'comparison': {
+                'match_message': ["******✅ 所有文件哈希值相同******"],
+                'mismatch_message': ["******⚠️ 存在不一致的哈希值******"]
             }
         }
 
-        # 生成性能配置组合
-        perf_keys = list(base_config['performance'].keys())
-        perf_values = list(base_config['performance'].values())
-        
-        for perf_combo in itertools.product(*perf_values):
-            for algos in base_config['algorithms']:
-                for out_format in base_config['output']['format']:
-                    config = {
-                        'performance': dict(zip(perf_keys, perf_combo)),
-                        'algorithms': algos,
-                        'output': {
-                            'color': False,
-                            'progress_bar': False,
-                            'show_time': True,
-                            'format': out_format
-                        },
-                        'file_handling': {
-                            'recursive': False,
-                            'retry_count': 1,
-                            'ignore_errors': False
-                        },
-                        'logging': {
-                            'enabled': False
-                        }
-                    }
-                    yield config
+        # 生成配置组合
+        for perf_mode in [True, False]:
+            for buffer_size in [1024*1024, 8*1024*1024]:
+                for mmap in [True, False]:
+                    for threads in [1, 4]:
+                        # 生成算法组合
+                        for md5 in [True, False]:
+                            for sha256 in [True, False]:
+                                if not (md5 or sha256):
+                                    continue  # 跳过没有启用任何算法的情况
+                                
+                                config = {
+                                    'performance': {
+                                        'async_mode': perf_mode,
+                                        'buffer_size': buffer_size,
+                                        'use_mmap': mmap,
+                                        'thread_count': threads
+                                    },
+                                    'algorithms': {
+                                        'MD5': {'enabled': md5},
+                                        'SHA1': {'enabled': True},
+                                        'SHA256': {'enabled': sha256}
+                                    },
+                                    'comparison': {
+                                        'match_message': "******✅ 所有文件哈希值相同******",
+                                        'mismatch_message': "******⚠️ 存在不一致的哈希值******",
+                                        'detail_format': "{file1} 与 {file2} 的 {algo} 值不同"
+                                    },
+                                    'output': {
+                                        'color': False,
+                                        'progress_bar': False,
+                                        'show_time': True,
+                                        'format': 'default'
+                                    },
+                                    'file_handling': {
+                                        'recursive': False,
+                                        'retry_count': 1,
+                                        'ignore_errors': False
+                                    },
+                                    'logging': {
+                                        'enabled': False
+                                    }
+                                }
+                                yield config
 
     def test_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """测试单个配置"""

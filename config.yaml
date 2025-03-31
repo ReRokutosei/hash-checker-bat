@@ -7,11 +7,36 @@ performance:
 
 # 哈希算法配置
 algorithms:
-  - MD5
-  - SHA1
-  - SHA256
-  - SHA3_256
-  - BLAKE2b
+  MD5:
+    enabled: true
+    compare_format: "{filename}: {value}"
+  SHA1:
+    enabled: true
+    compare_format: "{filename}: {value}"
+  SHA256:
+    enabled: true
+    compare_format: "{filename}: {value}"
+  SHA3_256:
+    enabled: true
+    compare_format: "{filename}: {value}"
+  BLAKE2b:
+    enabled: true
+    compare_format: "{filename}: {value}"
+  SHA384:
+    enabled: false
+    compare_format: "{filename}: {value}"
+  SHA3_384:
+    enabled: false
+    compare_format: "{filename}: {value}"
+  SHA512:
+    enabled: false
+    compare_format: "{filename}: {value}"
+
+# 比较模式配置
+comparison:
+  match_message: "******✅ 所有文件哈希值相同******"
+  mismatch_message: "******⚠️ 存在不一致的哈希值******"
+  detail_format: "{file1} 与 {file2} 的 {algo} 值不同"
 
 # 输出配置
 output:
