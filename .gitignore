@@ -2,7 +2,7 @@
 *.csv
 *.md
 !README.md
-*.py
+gen.py
 test*
 *.xlsx
 ./新建文件夹
