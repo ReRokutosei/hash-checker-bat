@@ -1,148 +1,174 @@
 # 文件哈希计算工具
 
-一个高性能的文件哈希计算工具，支持多种哈希算法、异步处理和灵活的配置选项。
+CMD与PowerShell内置计算哈希值的工具虽然强大但不方便，因此使用python简化，提高效率。
 
-## 功能特点
+## 主要功能
 
-- 支持多种哈希算法 (MD5, SHA1, SHA256, SHA3_256, BLAKE2b)
-- 异步处理和多线程支持
-- 内存映射技术处理大文件
-- 可自定义的缓冲区大小
-- 支持多种输出格式 (默认/JSON/CSV)
-- 进度条显示
-- 彩色输出支持
-- 详细的日志记录
-- 可配置的文件处理选项
+- 三种工作模式：
+  - 计算模式 (-i): 计算一个或多个文件的哈希值
+  - 比较模式 (-s): 比较多个文件的哈希值是否相同
+  - 验证模式 (-a): 自动验证当前目录下的哈希校验文件
 
-## 安装要求
+- 文件处理特性：
+  - 支持通配符匹配文件
+  - 支持递归目录处理
+  - 支持大文件处理
+  - 支持多文件并行处理
 
-- Python 3.8 +
-- 依赖包：
-  ```bash
-  pip install pyyaml tqdm colorama
-  ```
+- 输出特性：
+  - 彩色输出支持
+  - 进度条显示
+  - 多种输出格式 (默认/JSON/CSV)
+  - 详细的比较结果
 
-## 快速开始
+## 安装和使用
 
-1. 克隆仓库：
-   ```bash
-   git clone https://github.com/ReRokutosei/hash-checker-bat.git
-   cd hash
-   ```
+### 环境要求
+- Python 3.8 或更高版本
+- 依赖包：pyyaml, tqdm, colorama
 
-2. 安装依赖：
-   ```bash
-   pip install -r requirements.txt
-   ```
+### 配置项目
+```bash
+git clone https://github.com/ReRokutosei/hash-checker-bat.git
+cd hash-checker-bat
+pip install -r requirements.txt # 安装依赖
+export PATH="$PATH:$(pwd)" # 将当前目录添加到环境变量
+```
 
-3. 运行工具：
-   ```bash
-   python hash.py -i file.txt          # 计算单个文件哈希值
-   python hash.py -i *.txt             # 计算多个文件哈希值
-   python hash.py -s file1.txt file2.txt  # 比较两个文件
-   ```
+### 基本用法
+| 模式       | 描述                                                                 | 命令示例                          |
+|------------|----------------------------------------------------------------------|-----------------------------------|
+| 计算模式 `-i` | 计算单个/多个文件的哈希值                                            | `hash -i file.txt *.zip`          |
+| 比较模式 `-s` | 比较多个文件的哈希值是否一致                                          | `hash -s file1 file2`             |
+| 验证模式 `-a` | 自动验证当前目录下所有哈希校验文件（如`.md5`, `.sha256`等）          | `hash -a`                         |
 
-## 配置说明
 
-配置文件 (config.yaml) 包含以下主要部分：
+## 配置文件详解
 
-### 性能配置
+配置文件（config.yaml）支持以下配置项：
+
+### 1. 性能配置 (performance)
 ```yaml
 performance:
-  async_mode: true          # 是否启用异步模式
-  buffer_size: 8388608      # 读取缓冲区大小(8MB)
-  use_mmap: true           # 是否使用mmap处理大文件
-  thread_count: 4          # 线程池大小
+  async_mode: true    # 启用异步处理模式
+  buffer_size: 8388608 # 读取缓冲区大小(8MB)
+  use_mmap: true     # 使用内存映射读取大文件
+  thread_count: 4    # 并行处理线程数
 ```
 
-### 算法选择
+### 2. 哈希算法配置 (algorithms)
 ```yaml
 algorithms:
-  - MD5
-  - SHA1
-  - SHA256
-  - SHA3_256
-  - BLAKE2b
+  MD5:               # 算法名称
+    enabled: true    # 是否启用
+    compare_format: "{filename}: {value}"  # 比较输出格式
+  SHA1:
+    enabled: true
+    compare_format: "{filename}: {value}"
+  # 支持的算法：MD5, SHA1, SHA256, SHA3_256, BLAKE2b, SHA384, SHA3_384, SHA512 等
+```
+#### 查询可使用的算法
+```python
+print(hashlib.algorithms_available)  # 当前环境中可用的所有算法
+print(hashlib.algorithms_guaranteed)  # Python 内置保证支持的算法
 ```
 
-### 输出设置
+### 3. 比较模式配置 (comparison)
+```yaml
+comparison:
+  match_message: "******✅ 所有文件哈希值相同******"    # 自定义匹配成功消息
+  mismatch_message: "******⚠️ 存在不一致的哈希值******" # 自定义匹配失败消息
+  detail_format: "{file1} 与 {file2} 的 {algo} 值不同"  # 自定义差异详情格式
+```
+
+### 4. 输出配置 (output)
 ```yaml
 output:
-  color: true              # 启用彩色输出
-  progress_bar: true       # 显示进度条
-  show_time: true         # 显示处理时间
-  format: "default"        # 输出格式(default/json/csv)
+  color: true        # 启用彩色输出
+  progress_bar: true # 显示进度条
+  show_time: true    # 显示处理时间
+  format: "default"  # 输出格式 (default/json/csv)
 ```
 
-### 文件处理
+### 5. 文件处理配置 (file_handling)
 ```yaml
 file_handling:
-  recursive: false         # 是否递归扫描子目录
-  retry_count: 3          # 文件读取失败重试次数
-  ignore_errors: false    # 是否忽略错误继续执行
+  recursive: false   # 是否递归处理子目录
+  retry_count: 3    # 读取失败重试次数
+  ignore_errors: false # 是否忽略错误继续执行
 ```
 
-## 性能优化建议
+### 6. 排除规则 (exclude_patterns)
+```yaml
+exclude_patterns:
+  - "*.tmp"         # 排除临时文件
+  - "*.temp"
+  - "~*"
+```
 
-1. 大文件处理
-   - 启用 `use_mmap: true`
-   - 设置合适的 `buffer_size`（建议 8MB）
-   - 开启异步模式 `async_mode: true`
+### 7. 日志配置 (logging)
+```yaml
+logging:
+  enabled: true     # 启用日志
+  level: "INFO"     # 日志级别
+  file: "hash_calculator.log" # 日志文件路径
+```
 
-2. 批量小文件处理
-   - 增加 `thread_count`
-   - 启用异步模式
-   - 根据CPU核心数调整线程数
+## 配置优化建议
 
-3. 内存受限环境
-   - 减小 `buffer_size`
-   - 禁用 `use_mmap`
-   - 减少同时处理的线程数
+### 大文件处理优化
+- 启用 mmap: `use_mmap: true`
+- 设置合适的缓冲区: `buffer_size: 8388608`
+- 禁用不必要的算法以减少计算量
+
+### 批量小文件处理优化
+- 启用异步模式: `async_mode: true`
+- 增加线程数: `thread_count: 8`
+- 启用递归处理: `recursive: true`
+
+### 内存受限环境优化
+- 禁用 mmap: `use_mmap: false`
+- 减小缓冲区: `buffer_size: 1048576`
+- 减少线程数: `thread_count: 2`
 
 ## 输出格式示例
-
 ### 默认格式
+```text
+[+] 计算 file1.zip...
+    MD5:    D41D8CD98F00B204E9800998ECF8427E
+    SHA256: 6A3B92293E7B42B93C7E2D2E3F4A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2
 ```
-文件: example.txt
---------------------------------------
-MD5:    d41d8cd98f00b204e9800998ecf8427e
-SHA1:   da39a3ee5e6b4b0d3255bfef95601890afd80709
-SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
---------------------------------------
-```
-
 ### JSON格式
 ```json
 {
-  "file": "example.txt",
+  "file": "file2.txt",
   "hashes": {
-    "MD5": "d41d8cd98f00b204e9800998ecf8427e",
-    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
-    "SHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-  }
+    "SHA1": "A1B2C3D4E5F6...",
+    "BLAKE2b": "1A2B3C4D5E6F..."
+  },
+  "timestamp": "2024-03-12T15:30:00Z"
 }
 ```
-
 ### CSV格式
+```text
+file,md5,sha1,sha256,blake2b
+file1.txt,D41D8CD98F00B204E9800998ECF8427E,A1B2C3D4E5F6...,1A2B3C4D5E6F...,1A2B3C4D5E6F...
 ```
-file,md5,sha1,sha256
-example.txt,d41d8cd98f00b204e9800998ecf8427e,da39a3ee5e6b4b0d3255bfef95601890afd80709,e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+## 测试说明
+### 运行测试
+
+```bash
+# 执行全部单元测试
+python test_unit.py
+
+# 运行配置压力测试
+python test_config.py
 ```
 
-## 开发者工具
-
-项目包含两个测试工具：
-
-1. `test_hash.py`: 基础功能测试
-   ```bash
-   python test_hash.py
-   ```
-
-2. `test_config.py`: 配置性能测试
-   ```bash
-   python test_config.py
-   ```
+###  测试覆盖
+文件类型：文本、二进制、空文件、中文命名文件
+边界情况：无效路径、权限问题、递归通配符
+性能验证：不同配置组合的执行时长测试
 
 ## 许可证
-
 本项目采用 MIT 许可证。查看 [LICENSE](LICENSE) 文件了解更多详细信息。
