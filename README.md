@@ -35,15 +35,24 @@ CMD与PowerShell内置计算哈希值的工具虽然强大但不方便，因此�
 git clone https://github.com/ReRokutosei/hash-checker-bat.git
 cd hash-checker-bat
 pip install -r requirements.txt # 安装依赖
-export PATH="$PATH:$(pwd)" # 将当前目录添加到环境变量
+export PATH="$PATH:$(pwd)" # 将当前目录添加到环境变量(Unix/Linux)
+setx PATH "%PATH%;%cd%" /M # 将当前目录添加到环境变量(Windows CMD管理员模式)
+```
+
+如果一切正常，输入`hash`，你能看到：
+```sh
+用法：
+hash -i file           计算单个或多个文件的哈希值
+hash -s file1 file2    比较两个或多个文件的哈希值
+hash -a         无参数，自动验证当前目录下的哈希文件
 ```
 
 ### 基本用法
-| 模式       | 描述                                                                 | 命令示例                          |
-|------------|----------------------------------------------------------------------|-----------------------------------|
-| 计算模式 `-i` | (input)计算单个/多个文件的哈希值                                            | `hash -i file.txt *.zip`          |
-| 比较模式 `-s` | (same )比较多个文件的哈希值是否一致                                          | `hash -s file1 file2`             |
-| 验证模式 `-a` | (auto )自动匹配验证当前目录下的哈希文件（如`file.md5`与`file.txt`）          | `hash -a`                         |
+| 模式  | 描述| 命令示例                          |
+|-|-|-|
+| 计算模式 `-i` | (input)计算单个/多个文件的哈希值                                    | `hash -i file.txt *.zip`          |
+| 比较模式 `-s` | (same )比较多个文件的哈希值是否一致                                 | `hash -s file1 file2`             |
+| 验证模式 `-a` | (auto )自动匹配验证当前目录下的哈希文件（如`file.md5`与`file.txt`）  | `hash -a`                         |
 
 
 ## 配置文件详解
