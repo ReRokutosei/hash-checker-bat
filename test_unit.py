@@ -121,7 +121,10 @@ class TestHashCalculator(unittest.TestCase):
                 'color': False,
                 'progress_bar': False,
                 'show_time': True,
-                'format': 'default'
+                'format': 'default',
+                'generate_hash_file': False,
+                'hash_file_format': 'GNU',
+                'hash_file_encoding': 'utf-8'
             },
             'file_handling': {
                 'recursive': False,
@@ -509,6 +512,132 @@ class TestHashCalculator(unittest.TestCase):
             self._log_error('test_compare_summary_messages', str(e))
             raise
 
+    def test_parse_hash_file_formats(self):
+        """测试不同格式的哈希校验文件解析"""
+        test_cases = {
+            'gnu_single.md5': 'd41d8cd98f00b204e9800998ecf8427e *test.txt',
+            'gnu_multi.sha256': '''
+                e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 *file1.txt
+                6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b *file2.txt
+            ''',
+            'bsd_format.md5': 'MD5 (test.txt) = d41d8cd98f00b204e9800998ecf8427e',
+            'hash_only.md5': 'd41d8cd98f00b204e9800998ecf8427e',
+            'space_in_name.sha1': 'da39a3ee5e6b4b0d3255bfef95601890afd80709 file with spaces.txt'
+        }
+
+        for filename, content in test_cases.items():
+            filepath = os.path.join(self.test_dir, filename)
+            with open(filepath, 'w') as f:
+                f.write(content.strip())
+
+            try:
+                calculator = HashCalculator(self.test_config)
+                entries = calculator.parse_hash_file(filepath)
+                self.assertTrue(len(entries) > 0)
+                for entry in entries:
+                    self.assertIn('filename', entry)
+                    self.assertIn('hash', entry)
+                    self.assertIn('binary', entry)
+            except Exception as e:
+                self._log_error(f'test_parse_hash_file_formats ({filename})', str(e))
+                raise
+
+    def test_hash_file_generation(self):
+        """测试哈希文件生成功能"""
+        try:
+            # 修改工作目录到测试目录
+            original_dir = os.getcwd()
+            os.chdir(self.test_dir)
+            
+            try:
+                # 创建自定义配置
+                test_config = os.path.join(self.test_dir, 'custom_config.yaml')
+                config = {
+                    'performance': {
+                        'async_mode': True,
+                        'buffer_size': 8388608,
+                        'use_mmap': True,
+                        'thread_count': 4
+                    },
+                    'algorithms': {
+                        'MD5': {'enabled': True},
+                        'SHA1': {'enabled': True},
+                        'SHA256': {'enabled': True}
+                    },
+                    'output': {
+                        'color': False,
+                        'progress_bar': False,
+                        'show_time': True,
+                        'format': 'default',
+                        'generate_hash_file': True,
+                        'hash_file_format': 'GNU',
+                        'hash_file_encoding': 'utf-8'
+                    },
+                    'file_handling': {
+                        'recursive': False,
+                        'retry_count': 3,
+                        'ignore_errors': False
+                    },
+                    'logging': {
+                        'enabled': True,
+                        'level': 'DEBUG',
+                        'file': os.path.join(self.test_dir, 'test.log')
+                    },
+                    'comparison': {
+                        'match_message': "******✅ 所有文件哈希值相同******",
+                        'mismatch_message': "******⚠️ 存在不一致的哈希值******",
+                        'detail_format': "{file1} 与 {file2} 的 {algo} 值不同"
+                    }
+                }
+                with open(test_config, 'w') as f:
+                    yaml.dump(config, f)
+                
+                calculator = HashCalculator(test_config)
+                test_file = os.path.join(self.test_dir, 'test_hash_gen.txt')
+                
+                # 创建测试文件
+                with open(test_file, 'wb') as f:
+                    f.write(b'test content')
+                
+                # 计算哈希并生成校验文件
+                calculator.calculate_file_hash(test_file)
+                
+                # 检查生成的文件
+                self.assertTrue(os.path.exists('MD5SUMS'))
+                self.assertTrue(os.path.exists('SHA1SUMS'))
+                
+                # 验证生成的哈希文件内容
+                with open('MD5SUMS', 'r') as f:
+                    content = f.read()
+                    self.assertIn('test_hash_gen.txt', content)
+                
+            finally:
+                # 恢复原工作目录
+                os.chdir(original_dir)
+                
+        except Exception as e:
+            self._log_error('test_hash_file_generation', str(e))
+            raise
+
+    def test_auto_detect_hash_type(self):
+        """测试哈希类型自动检测"""
+        test_cases = {
+            'MD5': 'd41d8cd98f00b204e9800998ecf8427e',
+            'SHA1': 'da39a3ee5e6b4b0d3255bfef95601890afd80709',
+            'SHA256': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+        }
+
+        calculator = HashCalculator(self.test_config)
+        
+        for expected_type, hash_value in test_cases.items():
+            filename = f'test.{expected_type.lower()}'
+            filepath = os.path.join(self.test_dir, filename)
+            with open(filepath, 'w') as f:
+                f.write(hash_value)
+            
+            _, detected_type = calculator.is_hash_file(filepath)
+            self.assertEqual(detected_type, expected_type)
+
 def run_tests():
     # 配置测试运行器
     suite = unittest.TestLoader().loadTestsFromTestCase(TestHashCalculator)
@@ -530,3 +659,4 @@ def run_tests():
 
 if __name__ == '__main__':
     run_tests()
+

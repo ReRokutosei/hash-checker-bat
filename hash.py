@@ -9,7 +9,7 @@ import yaml
 import logging
 import concurrent.futures
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 from tqdm import tqdm
 from colorama import init, Fore, Style
@@ -90,7 +90,10 @@ class HashCalculator:
                 'color': True,
                 'progress_bar': True,
                 'show_time': True,
-                'format': 'default'
+                'format': 'default',
+                'generate_hash_file': False,
+                'hash_file_format': 'GNU',
+                'hash_file_encoding': 'utf-8'
             },
             'file_handling': {
                 'recursive': False,
@@ -199,7 +202,14 @@ class HashCalculator:
             logging.error(f"处理文件 {filepath} 时出错: {e}")
             raise
         
-        return {name: h.hexdigest() for name, h in hashes.items()}
+        results = {name: h.hexdigest() for name, h in hashes.items()}
+        
+        # 如果配置启用了哈希文件生成，则为每个算法生成哈希文件
+        if self.config['output']['generate_hash_file']:
+            for algo, value in results.items():
+                self.write_hash_file(os.path.basename(filepath), value, algo)
+                
+        return results
 
     def compare_files(self, files: List[str]) -> Dict[str, Any]:
         """比较多个文件的哈希值"""
@@ -359,38 +369,100 @@ class HashCalculator:
             
         return results
 
-    def auto_verify_files(self) -> None:
-        """自动验证模式"""
-        # 获取所有可用的哈希算法
-        all_algorithms = {name.upper() for name in hashlib.algorithms_available}
-        temp_hash_funcs = {}
+    def is_hash_file(self, filepath: str) -> Tuple[bool, str]:
+        """判断文件是否为哈希校验文件，返回 (是否哈希文件, 算法名称)"""
+        filename = os.path.basename(filepath).upper()
         
-        # 获取当前目录下所有哈希文件
-        hash_files = []
-        for algo in all_algorithms:
-            hash_files.extend(glob.glob(f"*.{algo.lower()}"))
+        # 1. 检查标准命名格式
+        standard_names = {
+            'MD5SUMS', 'SHA1SUMS', 'SHA256SUMS', 'SHA512SUMS',
+            'CHECKSUMS', 'CHECKSUMS.TXT'
+        }
+        if filename in standard_names:
+            return True, self._detect_hash_type(filepath)
         
-        if not hash_files:
-            print("未找到任何哈希校验文件")
+        # 2. 检查文件扩展名
+        known_extensions = {
+            '.MD5', '.SHA1', '.SHA256', '.SHA512',
+            '.MD5SUM', '.SHA1SUM', '.SHA256SUM', '.SHA512SUM'
+        }
+        ext = os.path.splitext(filename)[1]
+        if ext in known_extensions:
+            return True, ext[1:].rstrip('SUM')
+        
+        return False, ''
+
+    def _detect_hash_type(self, filepath: str) -> str:
+        """检测哈希文件的算法类型"""
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                first_line = f.readline().strip()
+                
+            # BSD 格式检测
+            if ' = ' in first_line:
+                algo = first_line.split(' ')[0].upper()
+                return algo
+            
+            # GNU 格式检测
+            if len(first_line.split()[0]) == 32:
+                return 'MD5'
+            elif len(first_line.split()[0]) == 40:
+                return 'SHA1'
+            elif len(first_line.split()[0]) == 64:
+                return 'SHA256'
+            elif len(first_line.split()[0]) == 128:
+                return 'SHA512'
+        except:
+            pass
+        
+        return 'UNKNOWN'
+
+    def write_hash_file(self, filepath: str, hash_value: str, algorithm: str) -> None:
+        """写入哈希校验文件"""
+        if not self.config['output']['generate_hash_file']:
             return
             
+        format = self.config['output']['hash_file_format'].upper()
+        encoding = self.config['output']['hash_file_encoding']
+        
+        # 确定输出文件名
+        if format == 'GNU':
+            outfile = f"{algorithm}SUMS"
+        else:
+            outfile = f"{filepath}.{algorithm.lower()}"
+            
+        try:
+            with open(outfile, 'a', encoding=encoding) as f:
+                if format == 'GNU':
+                    # GNU 格式：哈希值 *文件名
+                    f.write(f"{hash_value} *{filepath}\n")
+                else:
+                    # BSD 格式：算法 (文件名) = 哈希值
+                    f.write(f"{algorithm} ({filepath}) = {hash_value}\n")
+        except Exception as e:
+            logging.error(f"写入哈希文件失败: {e}")
+
+    def auto_verify_files(self) -> None:
+        """自动验证模式"""
         success_count = 0
         fail_count = 0
         
-        for hash_file in hash_files:
-            algo = os.path.splitext(hash_file)[1][1:].upper()
-            
-            # 如果算法被禁用，临时启用它
-            if algo not in self.hash_funcs:
-                if hasattr(hashlib, algo.lower()):
-                    temp_hash_funcs[algo] = getattr(hashlib, algo.lower())
-                else:
+        # 获取当前目录下的哈希文件
+        for filename in os.listdir('.'):
+            is_hash_file, algo = self.is_hash_file(filename)
+            if not is_hash_file:
+                continue
+                
+            try:
+                # 尝试获取哈希函数
+                if not hasattr(hashlib, algo.lower()):
                     print(f"⚠️ 不支持的哈希算法: {algo}")
                     continue
-            
-            try:
+                    
+                hash_func = getattr(hashlib, algo.lower())
+                
                 # 解析哈希文件
-                hash_entries = self.parse_hash_file(hash_file)
+                hash_entries = self.parse_hash_file(filename)
                 
                 for entry in hash_entries:
                     if not os.path.exists(entry['filename']):
@@ -399,14 +471,12 @@ class HashCalculator:
                         continue
                     
                     # 计算实际哈希值
-                    hash_func = self.hash_funcs.get(algo) or temp_hash_funcs.get(algo)
-                    actual_hash = hash_func()
-                    
+                    hasher = hash_func()
                     with open(entry['filename'], 'rb') as f:
                         while chunk := f.read(self.config['performance']['buffer_size']):
-                            actual_hash.update(chunk)
+                            hasher.update(chunk)
                     
-                    actual_value = actual_hash.hexdigest().lower()
+                    actual_value = hasher.hexdigest().lower()
                     
                     if actual_value == entry['hash']:
                         print(f"✅ {entry['filename']} ({algo}) 验证通过")
@@ -418,11 +488,9 @@ class HashCalculator:
                         fail_count += 1
                         
             except Exception as e:
-                print(f"处理 {hash_file} 时出错: {e}")
+                print(f"处理 {filename} 时出错: {e}")
                 fail_count += 1
         
-        # 清理临时哈希函数
-        temp_hash_funcs.clear()
         print(f"\n验证完成: 成功 {success_count}, 失败 {fail_count}")
 
     def format_output(self, filepath: str, hashes: Dict[str, str], output_format: str = "default") -> None:
@@ -468,6 +536,9 @@ class HashCalculator:
                             try:
                                 hashes = future.result()
                                 self.format_output(filepath, hashes, kwargs.get('format', 'default'))
+                                # 写入哈希文件
+                                for algo, value in hashes.items():
+                                    self.write_hash_file(filepath, value, algo)
                             except Exception as e:
                                 logging.error(f"处理文件 {filepath} 失败: {e}")
                                 if not self.config['file_handling']['ignore_errors']:

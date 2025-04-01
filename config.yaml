@@ -44,6 +44,9 @@ output:
   progress_bar: true       # 显示进度条
   show_time: true         # 显示处理时间
   format: "default"        # 输出格式(default/json/csv)
+  generate_hash_file: false    # 是否生成哈希校验文件
+  hash_file_format: "GNU"      # 校验文件格式 (GNU/BSD)
+  hash_file_encoding: "utf-8"  # 校验文件编码
 
 # 文件处理
 file_handling:

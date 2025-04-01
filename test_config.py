@@ -38,6 +38,23 @@ class ConfigTester:
             'comparison': {
                 'match_message': ["******✅ 所有文件哈希值相同******"],
                 'mismatch_message': ["******⚠️ 存在不一致的哈希值******"]
+            },
+            'output': {
+                'color': [False],
+                'progress_bar': [False],
+                'show_time': [True],
+                'format': ['default'],
+                'generate_hash_file': [True, False],
+                'hash_file_format': ['GNU', 'BSD'],
+                'hash_file_encoding': ['utf-8', 'gbk']
+            },
+            'file_handling': {
+                'recursive': False,
+                'retry_count': 1,
+                'ignore_errors': False
+            },
+            'logging': {
+                'enabled': False
             }
         }
 
@@ -73,7 +90,10 @@ class ConfigTester:
                                         'color': False,
                                         'progress_bar': False,
                                         'show_time': True,
-                                        'format': 'default'
+                                        'format': 'default',
+                                        'generate_hash_file': True,
+                                        'hash_file_format': 'GNU',
+                                        'hash_file_encoding': 'utf-8'
                                     },
                                     'file_handling': {
                                         'recursive': False,

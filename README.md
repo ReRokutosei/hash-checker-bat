@@ -1,5 +1,8 @@
 # 文件哈希计算工具
 
+[![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 CMD与PowerShell内置计算哈希值的工具虽然强大但不方便，因此使用python简化，提高效率。
 
 ## 主要功能
@@ -83,29 +86,66 @@ comparison:
   detail_format: "{file1} 与 {file2} 的 {algo} 值不同"  # 可自定义差异详情格式
 ```
 ### 4. 自动校验模式说明
-- 支持的哈希校验文件格式：
-   - | 格式类型               | 描述                                                                 | 示例                                                |
-   |------------------------|----------------------------------------------------------------------|-----------------------------------------------------|
-   | **标准格式**           | `[哈希值] [文件名]`，最常见和基础的格式。                              | `d41d8cd98f00b204e9800998ecf8427e example_file.txt` |
-   | **带星号标记二进制模式** | 二进制模式读取的文件，文件名前有一个星号 (`*`)。                | `da39a3ee5e6b4b0d3255bfef95601890afd80709 *example_file.bin` |
-   | **无文件名**            | 仅包含哈希值。                         | `d41d8cd98f00b204e9800998ecf8427e`                 |
-   | **多文件校验文件**      | 每行代表一个文件及其对应的哈希值。           | <pre><code>hash1 file1.txt<br>hash2 file2.jpg<br>hash3 file3.pdf</code></pre> |
 
-- 自动校验模式会自动搜索当前目录下的哈希文件，并自动进行哈希值校验
-   - 如果哈希校验文件中包含文件名（如 `[哈希值] [文件名]`），程序会优先使用该文件名进行匹配。
-     - 示例：如果 `example.md5` 文件中存储的内容是 `d41d8cd98f00b204e9800998ecf8427e xxx.txt`，程序会优先查找并匹配 `xxx.txt`。
-   - 如果哈希校验文件中未包含文件名（如 `[哈希值]`），程序会尝试将哈希文件的文件名作为目标文件名进行匹配。
-     - 示例：如果 `example.md5` 文件中只包含 `d41d8cd98f00b204e9800998ecf8427e`，程序会优先查找名为 `example.*` 的文件。
-- 如果存在不一致的哈希值，程序会自动进行差异比较，并输出详细的比较结果。
+支持的哈希校验文件格式与命名规则：
+
+1. 标准格式（推荐）
+   - 文件命名：`[ALGO]SUMS` 或 `[文件名].[ALGO]`
+   - 内容格式：`[哈希值] *[文件名]`
+   - 示例：`d41d8cd98f00b204e9800998ecf8427e *example.txt`
+
+2. BSD 风格格式
+   - 文件命名：`[文件名].[ALGO]`
+   - 内容格式：`[ALGO] ([文件名]) = [哈希值]`
+   - 示例：`MD5 (example.txt) = d41d8cd98f00b204e9800998ecf8427e`
+
+3. 简单格式
+   - 文件命名：`[目标文件名].[ALGO]`
+   - 内容格式：`[哈希值]`
+   - 示例：`d41d8cd98f00b204e9800998ecf8427e`
+
+4. 批量校验格式
+   - 文件命名：`CHECKSUMS` 或 `CHECKSUMS.txt`
+   - 内容格式：每行 `[哈希值] [文件名]`
+   - 示例：
+     ```
+     d41d8cd98f00b204e9800998ecf8427e file1.txt
+     da39a3ee5e6b4b0d3255bfef95601890afd80709 file2.jpg
+     ```
+
+文件匹配优先级：
+1. 校验文件中显式指定的文件名
+2. 校验文件名对应的目标文件（移除算法后缀）
+3. 当前目录下的所有文件（仅用于 CHECKSUMS 类文件）
+
+注意事项：
+1. 文件名前的星号 (*) 表示文件应以二进制模式读取
+2. 校验失败时会显示详细的哈希值对比信息
+3. 支持多种命名约定（MD5SUMS, SHA256SUMS 等）
+4. 不区分哈希值大小写
 
 ### 5. 输出配置 (output)
 ```yaml
 output:
-  color: true        # 启用彩色输出
-  progress_bar: true # 显示进度条
-  show_time: true    # 显示处理时间
-  format: "default"  # 输出格式 (default/json/csv)
+  color: true              # 启用彩色输出
+  progress_bar: true       # 显示进度条
+  show_time: true         # 显示处理时间
+  format: "default"        # 输出格式 (default/json/csv)
+  generate_hash_file: false    # 是否在计算哈希值时生成校验文件
+  hash_file_format: "GNU"      # 校验文件格式，支持 GNU/BSD 两种格式
+  hash_file_encoding: "utf-8"  # 校验文件的编码格式
 ```
+
+#### 校验文件格式说明
+1. GNU 格式（默认）:
+   - 文件命名：`[算法名]SUMS`（如 `MD5SUMS`, `SHA256SUMS`）
+   - 内容格式：`[哈希值] *[文件名]`
+   - 示例：`d41d8cd98f00b204e9800998ecf8427e *example.txt`
+
+2. BSD 格式:
+   - 文件命名：`[文件名].[算法名]`（如 `file.md5`, `file.sha256`）
+   - 内容格式：`[算法] ([文件名]) = [哈希值]`
+   - 示例：`MD5 (example.txt) = d41d8cd98f00b204e9800998ecf8427e`
 
 ### 6. 文件处理配置 (file_handling)
 ```yaml
@@ -164,5 +204,3 @@ python test_config.py
 边界情况：无效路径、权限问题、递归通配符
 性能验证：不同配置组合的执行时长测试
 
-## 许可证
-本项目采用 MIT 许可证。查看 [LICENSE](LICENSE) 文件了解更多详细信息。
