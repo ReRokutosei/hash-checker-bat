@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
-import sys
-import os
-import hashlib
-import glob
-import time
-import mmap
-import yaml
-import logging
 import concurrent.futures
-from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
+import glob
+import hashlib
+import logging
+import mmap
+import os
+import sys
+import time
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import yaml
+from colorama import Fore, Style, init
 from tqdm import tqdm
-from colorama import init, Fore, Style
 
 # 初始化彩色输出
 init()
+
 
 class HashCalculator:
     def __init__(self, config_path: str = "config.yaml"):
@@ -29,26 +31,30 @@ class HashCalculator:
             self.config = self.get_default_config()
         self.setup_logging()
         self.setup_algorithms()
-        
+
     def _resolve_config_path(self, config_path: str) -> str:
         """解析配置文件路径"""
         if os.path.isabs(config_path):
             return config_path
-        
+
         # 首先检查当前目录
         if os.path.exists(config_path):
             return os.path.abspath(config_path)
-            
+
         # 然后检查用户目录
-        user_config = os.path.join(os.path.expanduser("~"), ".config", "hash", "config.yaml")
+        user_config = os.path.join(
+            os.path.expanduser("~"), ".config", "hash", "config.yaml"
+        )
         if os.path.exists(user_config):
             return user_config
-            
+
         # 最后检查程序所在目录
-        prog_config = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml")
+        prog_config = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "config.yaml"
+        )
         if os.path.exists(prog_config):
             return prog_config
-            
+
         # 如果都不存在，使用用户目录
         return user_config
 
@@ -56,14 +62,20 @@ class HashCalculator:
         """验证配置是否有效"""
         if not isinstance(config, dict):
             return False
-            
-        required_sections = ['performance', 'algorithms', 'output', 'file_handling', 'logging']
+
+        required_sections = [
+            "performance",
+            "algorithms",
+            "output",
+            "file_handling",
+            "logging",
+        ]
         return all(section in config for section in required_sections)
 
     def load_config(self, config_path: str) -> Dict[str, Any]:
         """加载配置文件"""
         try:
-            with open(config_path, 'r', encoding='utf-8') as f:
+            with open(config_path, "r", encoding="utf-8") as f:
                 config = yaml.safe_load(f)
                 if config is None:
                     raise ValueError("配置文件为空")
@@ -71,45 +83,45 @@ class HashCalculator:
         except Exception as e:
             logging.warning(f"无法加载配置文件: {e}，使用默认配置")
             return self.get_default_config()
-    
+
     def get_default_config(self) -> Dict[str, Any]:
         """返回默认配置"""
         return {
-            'performance': {
-                'async_mode': True,
-                'buffer_size': 8388608,
-                'use_mmap': True,
-                'thread_count': 4
+            "performance": {
+                "async_mode": True,
+                "buffer_size": 8388608,
+                "use_mmap": True,
+                "thread_count": 4,
             },
-            'algorithms': {
-                'MD5': {'enabled': True},
-                'SHA1': {'enabled': True},
-                'SHA256': {'enabled': True}
+            "algorithms": {
+                "MD5": {"enabled": True},
+                "SHA1": {"enabled": True},
+                "SHA256": {"enabled": True},
             },
-            'output': {
-                'color': True,
-                'progress_bar': True,
-                'show_time': True,
-                'format': 'default',
-                'generate_hash_file': False,
-                'hash_file_format': 'GNU',
-                'hash_file_encoding': 'utf-8'
+            "output": {
+                "color": True,
+                "progress_bar": True,
+                "show_time": True,
+                "format": "default",
+                "generate_hash_file": False,
+                "hash_file_format": "GNU",
+                "hash_file_encoding": "utf-8",
             },
-            'file_handling': {
-                'recursive': False,
-                'retry_count': 3,
-                'ignore_errors': False
+            "file_handling": {
+                "recursive": False,
+                "retry_count": 3,
+                "ignore_errors": False,
             },
-            'logging': {
-                'enabled': True,
-                'level': 'INFO',
-                'file': 'hash_calculator.log'
+            "logging": {
+                "enabled": True,
+                "level": "INFO",
+                "file": "hash_calculator.log",
             },
-            'comparison': {
-                'match_message': "所有文件的哈希值均匹配",
-                'mismatch_message': "存在哈希值不匹配的文件",
-                'detail_format': "文件 {file1} 和 {file2} 的 {algo} 哈希值不匹配"
-            }
+            "comparison": {
+                "match_message": "所有文件的哈希值均匹配",
+                "mismatch_message": "存在哈希值不匹配的文件",
+                "detail_format": "文件 {file1} 和 {file2} 的 {algo} 哈希值不匹配",
+            },
         }
 
     def create_default_config(self, config_path: str) -> None:
@@ -120,9 +132,15 @@ class HashCalculator:
             config_dir = os.path.dirname(config_path)
             if config_dir:  # 如果不是当前目录
                 os.makedirs(config_dir, exist_ok=True)
-                
-            with open(config_path, 'w', encoding='utf-8') as f:
-                yaml.dump(config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+
+            with open(config_path, "w", encoding="utf-8") as f:
+                yaml.dump(
+                    config,
+                    f,
+                    allow_unicode=True,
+                    default_flow_style=False,
+                    sort_keys=False,
+                )
             logging.info(f"已创建默认配置文件: {config_path}")
         except Exception as e:
             logging.error(f"创建配置文件失败: {e}")
@@ -130,85 +148,111 @@ class HashCalculator:
 
     def setup_logging(self) -> None:
         """设置日志处理"""
-        log_config = self.config.get('logging', {})
-        if log_config.get('enabled', True):
+        log_config = self.config.get("logging", {})
+        if log_config.get("enabled", True):
             handlers = []
             # 添加文件处理器
-            if log_config.get('file'):
+            if log_config.get("file"):
                 try:
                     file_handler = logging.FileHandler(
-                        log_config['file'],
-                        mode='w',  # 使用 'w' 模式而不是 'a' 模式
-                        encoding='utf-8'
+                        log_config["file"],
+                        mode="w",  # 使用 'w' 模式而不是 'a' 模式
+                        encoding="utf-8",
                     )
                     file_handler.setFormatter(
-                        logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+                        logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
                     )
                     handlers.append(file_handler)
                 except Exception as e:
                     print(f"警告：无法创建日志文件：{e}")
-            
+
             # 添加控制台处理器
             console_handler = logging.StreamHandler()
             console_handler.setFormatter(
-                logging.Formatter('%(levelname)s: %(message)s')
+                logging.Formatter("%(levelname)s: %(message)s")
             )
             handlers.append(console_handler)
 
             # 配置根日志记录器
             logging.basicConfig(
-                level=getattr(logging, log_config.get('level', 'INFO')),
-                handlers=handlers
+                level=getattr(logging, log_config.get("level", "INFO")),
+                handlers=handlers,
             )
 
     def setup_algorithms(self) -> None:
         """设置哈希算法"""
         self.hash_funcs = {}
-        for algo, config in self.config['algorithms'].items():
-            if config.get('enabled', True) and hasattr(hashlib, algo.lower()):
+        for algo, config in self.config["algorithms"].items():
+            if config.get("enabled", True) and hasattr(hashlib, algo.lower()):
                 self.hash_funcs[algo] = getattr(hashlib, algo.lower())
 
-    def calculate_file_hash(self, filepath: str, show_progress: bool = True) -> Dict[str, str]:
+    def calculate_file_hash(
+        self, filepath: str, show_progress: bool = True
+    ) -> Dict[str, str]:
         file_size = os.path.getsize(filepath)
         hashes = {name: func() for name, func in self.hash_funcs.items()}
-        
+
         try:
-            with open(filepath, 'rb') as f:
-                if self.config['performance']['use_mmap'] and file_size > 0:
+            with open(filepath, "rb") as f:
+                if self.config["performance"]["use_mmap"] and file_size > 0:
                     with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
                         if show_progress:
-                            with tqdm(total=file_size, unit='B', unit_scale=True, desc=f"处理 {os.path.basename(filepath)}") as pbar:
-                                for chunk in iter(lambda: mm.read(self.config['performance']['buffer_size']), b''):
+                            with tqdm(
+                                total=file_size,
+                                unit="B",
+                                unit_scale=True,
+                                desc=f"处理 {os.path.basename(filepath)}",
+                            ) as pbar:
+                                for chunk in iter(
+                                    lambda: mm.read(
+                                        self.config["performance"]["buffer_size"]
+                                    ),
+                                    b"",
+                                ):
                                     for h in hashes.values():
                                         h.update(chunk)
                                     pbar.update(len(chunk))
                         else:
-                            for chunk in iter(lambda: mm.read(self.config['performance']['buffer_size']), b''):
+                            for chunk in iter(
+                                lambda: mm.read(
+                                    self.config["performance"]["buffer_size"]
+                                ),
+                                b"",
+                            ):
                                 for h in hashes.values():
                                     h.update(chunk)
                 else:
                     if show_progress:
-                        with tqdm(total=file_size, unit='B', unit_scale=True, desc=f"处理 {os.path.basename(filepath)}") as pbar:
-                            while chunk := f.read(self.config['performance']['buffer_size']):
+                        with tqdm(
+                            total=file_size,
+                            unit="B",
+                            unit_scale=True,
+                            desc=f"处理 {os.path.basename(filepath)}",
+                        ) as pbar:
+                            while chunk := f.read(
+                                self.config["performance"]["buffer_size"]
+                            ):
                                 for h in hashes.values():
                                     h.update(chunk)
                                 pbar.update(len(chunk))
                     else:
-                        while chunk := f.read(self.config['performance']['buffer_size']):
+                        while chunk := f.read(
+                            self.config["performance"]["buffer_size"]
+                        ):
                             for h in hashes.values():
                                 h.update(chunk)
-        
+
         except Exception as e:
             logging.error(f"处理文件 {filepath} 时出错: {e}")
             raise
-        
+
         results = {name: h.hexdigest() for name, h in hashes.items()}
-        
+
         # 如果配置启用了哈希文件生成，则为每个算法生成哈希文件
-        if self.config['output']['generate_hash_file']:
+        if self.config["output"]["generate_hash_file"]:
             for algo, value in results.items():
                 self.write_hash_file(os.path.basename(filepath), value, algo)
-                
+
         return results
 
     def compare_files(self, files: List[str]) -> Dict[str, Any]:
@@ -219,16 +263,12 @@ class HashCalculator:
             matched = glob.glob(pattern)
             if matched:
                 expanded_files.extend(matched)
-        
+
         if len(expanded_files) < 2:
             raise ValueError("比较模式需要至少两个文件")
-            
-        results = {
-            'reference': None,
-            'comparisons': [],
-            'all_match': True
-        }
-        
+
+        results = {"reference": None, "comparisons": [], "all_match": True}
+
         # 计算所有文件的哈希值
         hashes = {}
         for file in expanded_files:
@@ -236,79 +276,88 @@ class HashCalculator:
                 hashes[file] = self.calculate_file_hash(file)
             except Exception as e:
                 logging.error(f"处理文件 {file} 失败: {e}")
-                if not self.config['file_handling']['ignore_errors']:
+                if not self.config["file_handling"]["ignore_errors"]:
                     raise
                 continue
-        
+
         # 设置参考文件和比较结果
         ref_file = expanded_files[0]
-        results['reference'] = {'file': ref_file, 'hashes': hashes[ref_file]}
-        
+        results["reference"] = {"file": ref_file, "hashes": hashes[ref_file]}
+
         # 比较其他文件
         for file in expanded_files[1:]:
             if file not in hashes:
                 continue
-            
+
             comparison = {
-                'file': file,
-                'hashes': hashes[file],
-                'matches': {},
-                'mismatches': []
+                "file": file,
+                "hashes": hashes[file],
+                "matches": {},
+                "mismatches": [],
             }
-            
+
             for algo in self.hash_funcs.keys():
-                matches = (hashes[ref_file][algo] == hashes[file][algo])
-                comparison['matches'][algo] = matches
+                matches = hashes[ref_file][algo] == hashes[file][algo]
+                comparison["matches"][algo] = matches
                 if not matches:
-                    results['all_match'] = False
-                    mismatch = self.config['comparison']['detail_format'].format(
+                    results["all_match"] = False
+                    mismatch = self.config["comparison"]["detail_format"].format(
                         file1=os.path.basename(ref_file),
                         file2=os.path.basename(file),
-                        algo=algo
+                        algo=algo,
                     )
-                    comparison['mismatches'].append(mismatch)
-            
-            results['comparisons'].append(comparison)
-        
+                    comparison["mismatches"].append(mismatch)
+
+            results["comparisons"].append(comparison)
+
         return results
 
-    def format_comparison_output(self, results: Dict[str, Any], output_format: str = "default") -> None:
+    def format_comparison_output(
+        self, results: Dict[str, Any], output_format: str = "default"
+    ) -> None:
         """格式化比较结果输出"""
         if output_format == "json":
             import json
+
             print(json.dumps(results, ensure_ascii=False, indent=2))
-            
+
         elif output_format == "csv":
-            ref_file = results['reference']['file']
+            ref_file = results["reference"]["file"]
             print(f"file,algorithm,reference({ref_file}),value,matches")
-            for comp in results['comparisons']:
+            for comp in results["comparisons"]:
                 for algo in self.hash_funcs.keys():
-                    print(f"{comp['file']},{algo},{results['reference']['hashes'][algo]},"
-                          f"{comp['hashes'][algo]},{comp['matches'][algo]}")
+                    print(
+                        f"{comp['file']},{algo},{results['reference']['hashes'][algo]},"
+                        f"{comp['hashes'][algo]},{comp['matches'][algo]}"
+                    )
         else:
-            ref = results['reference']
-            print(f"\n参考文件: {Fore.CYAN}{os.path.basename(ref['file'])}{Style.RESET_ALL}")
+            ref = results["reference"]
+            print(
+                f"\n参考文件: {Fore.CYAN}{os.path.basename(ref['file'])}{Style.RESET_ALL}"
+            )
             print("--------------------------------------")
-            for algo, value in ref['hashes'].items():
+            for algo, value in ref["hashes"].items():
                 print(f"{algo}:    {Fore.GREEN}{value}{Style.RESET_ALL}")
             print("--------------------------------------")
-            
-            for comp in results['comparisons']:
-                print(f"\n比较文件: {Fore.CYAN}{os.path.basename(comp['file'])}{Style.RESET_ALL}")
+
+            for comp in results["comparisons"]:
+                print(
+                    f"\n比较文件: {Fore.CYAN}{os.path.basename(comp['file'])}{Style.RESET_ALL}"
+                )
                 print("--------------------------------------")
-                for algo, value in comp['hashes'].items():
-                    color = Fore.GREEN if comp['matches'][algo] else Fore.RED
+                for algo, value in comp["hashes"].items():
+                    color = Fore.GREEN if comp["matches"][algo] else Fore.RED
                     print(f"{algo}:    {color}{value}{Style.RESET_ALL}")
                 print("--------------------------------------")
-        
+
         # 添加总结信息
-        if results['all_match']:
+        if results["all_match"]:
             print(f"\n{self.config['comparison']['match_message']}")
         else:
             print(f"\n{self.config['comparison']['mismatch_message']}")
-            for comp in results['comparisons']:
-                if comp['mismatches']:
-                    for mismatch in comp['mismatches']:
+            for comp in results["comparisons"]:
+                if comp["mismatches"]:
+                    for mismatch in comp["mismatches"]:
                         print(mismatch)
 
     def parse_hash_file(self, hash_file: str) -> List[Dict[str, str]]:
@@ -317,123 +366,135 @@ class HashCalculator:
         """
         results = []
         target_file = os.path.splitext(hash_file)[0]
-        
+
         try:
-            with open(hash_file, 'r', encoding='utf-8') as f:
+            with open(hash_file, "r", encoding="utf-8") as f:
                 lines = [line.strip() for line in f if line.strip()]
-                
+
             # 处理单行情况
             if len(lines) == 1:
                 line = lines[0]
                 # 情况1: 仅包含哈希值
-                if ' ' not in line:
-                    results.append({
-                        'filename': target_file,
-                        'hash': line.lower(),
-                        'binary': False
-                    })
+                if " " not in line:
+                    results.append(
+                        {"filename": target_file, "hash": line.lower(), "binary": False}
+                    )
                 else:
                     # 情况2: "[hash] *filename" 或 "[hash] filename"
                     hash_value, *name_parts = line.split()
-                    filename = ' '.join(name_parts)
-                    if filename.startswith('*'):
+                    filename = " ".join(name_parts)
+                    if filename.startswith("*"):
                         filename = filename[1:]  # 去除星号
                         binary = True
                     else:
                         binary = False
-                    
-                    results.append({
-                        'filename': filename,
-                        'hash': hash_value.lower(),
-                        'binary': binary
-                    })
+
+                    results.append(
+                        {
+                            "filename": filename,
+                            "hash": hash_value.lower(),
+                            "binary": binary,
+                        }
+                    )
             # 处理多行情况
             else:
                 for line in lines:
-                    if ' ' in line:
+                    if " " in line:
                         hash_value, *name_parts = line.split()
-                        filename = ' '.join(name_parts)
-                        binary = filename.startswith('*')
+                        filename = " ".join(name_parts)
+                        binary = filename.startswith("*")
                         if binary:
                             filename = filename[1:]
-                        
-                        results.append({
-                            'filename': filename,
-                            'hash': hash_value.lower(),
-                            'binary': binary
-                        })
-        
+
+                        results.append(
+                            {
+                                "filename": filename,
+                                "hash": hash_value.lower(),
+                                "binary": binary,
+                            }
+                        )
+
         except Exception as e:
             logging.error(f"解析哈希文件 {hash_file} 时出错: {e}")
             raise
-            
+
         return results
 
     def is_hash_file(self, filepath: str) -> Tuple[bool, str]:
         """判断文件是否为哈希校验文件，返回 (是否哈希文件, 算法名称)"""
         filename = os.path.basename(filepath).upper()
-        
+
         # 1. 检查标准命名格式
         standard_names = {
-            'MD5SUMS', 'SHA1SUMS', 'SHA256SUMS', 'SHA512SUMS',
-            'CHECKSUMS', 'CHECKSUMS.TXT'
+            "MD5SUMS",
+            "SHA1SUMS",
+            "SHA256SUMS",
+            "SHA512SUMS",
+            "CHECKSUMS",
+            "CHECKSUMS.TXT",
         }
         if filename in standard_names:
             return True, self._detect_hash_type(filepath)
-        
+
         # 2. 检查文件扩展名
         known_extensions = {
-            '.MD5', '.SHA1', '.SHA256', '.SHA512',
-            '.MD5SUM', '.SHA1SUM', '.SHA256SUM', '.SHA512SUM'
+            ".MD5",
+            ".SHA1",
+            ".SHA256",
+            ".SHA512",
+            ".MD5SUM",
+            ".SHA1SUM",
+            ".SHA256SUM",
+            ".SHA512SUM",
         }
         ext = os.path.splitext(filename)[1]
         if ext in known_extensions:
-            return True, ext[1:].rstrip('SUM')
-        
-        return False, ''
+            return True, ext[1:].rstrip("SUM")
+
+        return False, ""
 
     def _detect_hash_type(self, filepath: str) -> str:
         """检测哈希文件的算法类型"""
         try:
-            with open(filepath, 'r', encoding='utf-8') as f:
+            with open(filepath, "r", encoding="utf-8") as f:
                 first_line = f.readline().strip()
-                
+
             # BSD 格式检测
-            if ' = ' in first_line:
-                algo = first_line.split(' ')[0].upper()
+            if " = " in first_line:
+                algo = first_line.split(" ")[0].upper()
                 return algo
-            
+
             # GNU 格式检测
             if len(first_line.split()[0]) == 32:
-                return 'MD5'
+                return "MD5"
             elif len(first_line.split()[0]) == 40:
-                return 'SHA1'
+                return "SHA1"
             elif len(first_line.split()[0]) == 64:
-                return 'SHA256'
+                return "SHA256"
             elif len(first_line.split()[0]) == 128:
-                return 'SHA512'
+                return "SHA512"
         except:
             pass
-        
-        return 'UNKNOWN'
+
+        return "UNKNOWN"
 
     def write_hash_file(self, filepath: str, hash_value: str, algorithm: str) -> None:
         """写入哈希校验文件"""
-        if not self.config['output']['generate_hash_file']:
+        if not self.config["output"]["generate_hash_file"]:
             return
-            
-        format = self.config['output']['hash_file_format'].upper()
-        encoding = self.config['output']['hash_file_encoding']
-        
+
+        format = self.config["output"]["hash_file_format"].upper()
+        encoding = self.config["output"]["hash_file_encoding"]
+
         # 确定输出文件名
-        if format == 'GNU':
+        if format == "GNU":
             outfile = f"{algorithm}SUMS"
         else:
             outfile = f"{filepath}.{algorithm.lower()}"
-            
+
         try:
-            with open(outfile, 'a', encoding=encoding) as f:
-                if format == 'GNU':
+            with open(outfile, "a", encoding=encoding) as f:
+                if format == "GNU":
                     # GNU 格式：哈希值 *文件名
                     f.write(f"{hash_value} *{filepath}\n")
                 else:
@@ -446,39 +507,41 @@ class HashCalculator:
         """自动验证模式"""
         success_count = 0
         fail_count = 0
-        
+
         # 获取当前目录下的哈希文件
-        for filename in os.listdir('.'):
+        for filename in os.listdir("."):
             is_hash_file, algo = self.is_hash_file(filename)
             if not is_hash_file:
                 continue
-                
+
             try:
                 # 尝试获取哈希函数
                 if not hasattr(hashlib, algo.lower()):
                     print(f"⚠️ 不支持的哈希算法: {algo}")
                     continue
-                    
+
                 hash_func = getattr(hashlib, algo.lower())
-                
+
                 # 解析哈希文件
                 hash_entries = self.parse_hash_file(filename)
-                
+
                 for entry in hash_entries:
-                    if not os.path.exists(entry['filename']):
+                    if not os.path.exists(entry["filename"]):
                         print(f"⚠️ 未找到文件: {entry['filename']}")
                         fail_count += 1
                         continue
-                    
+
                     # 计算实际哈希值
                     hasher = hash_func()
-                    with open(entry['filename'], 'rb') as f:
-                        while chunk := f.read(self.config['performance']['buffer_size']):
+                    with open(entry["filename"], "rb") as f:
+                        while chunk := f.read(
+                            self.config["performance"]["buffer_size"]
+                        ):
                             hasher.update(chunk)
-                    
+
                     actual_value = hasher.hexdigest().lower()
-                    
-                    if actual_value == entry['hash']:
+
+                    if actual_value == entry["hash"]:
                         print(f"✅ {entry['filename']} ({algo}) 验证通过")
                         success_count += 1
                     else:
@@ -486,16 +549,19 @@ class HashCalculator:
                         print(f"预期: {entry['hash']}")
                         print(f"实际: {actual_value}")
                         fail_count += 1
-                        
+
             except Exception as e:
                 print(f"处理 {filename} 时出错: {e}")
                 fail_count += 1
-        
+
         print(f"\n验证完成: 成功 {success_count}, 失败 {fail_count}")
 
-    def format_output(self, filepath: str, hashes: Dict[str, str], output_format: str = "default") -> None:
+    def format_output(
+        self, filepath: str, hashes: Dict[str, str], output_format: str = "default"
+    ) -> None:
         if output_format == "json":
             import json
+
             print(json.dumps({"file": filepath, "hashes": hashes}, ensure_ascii=False))
         elif output_format == "csv":
             print(f"{filepath},{','.join(hashes.values())}")
@@ -508,46 +574,61 @@ class HashCalculator:
 
     def process_files(self, files: List[str], mode: str, **kwargs) -> None:
         start_time = time.time()
-        
+
         try:
             if mode == "auto_verify":
                 self.auto_verify_files()
             elif mode == "compare":
                 results = self.compare_files(files)
-                self.format_comparison_output(results, kwargs.get('format', 'default'))
+                self.format_comparison_output(results, kwargs.get("format", "default"))
             else:  # info mode
-                if self.config['performance']['async_mode']:
+                if self.config["performance"]["async_mode"]:
                     with concurrent.futures.ThreadPoolExecutor(
-                        max_workers=self.config['performance']['thread_count']
+                        max_workers=self.config["performance"]["thread_count"]
                     ) as executor:
                         futures = []
                         for pattern in files:
-                            if self.config['file_handling']['recursive']:
+                            if self.config["file_handling"]["recursive"]:
                                 pattern = str(Path(pattern).absolute())
-                                for filepath in Path(os.path.dirname(pattern)).rglob(os.path.basename(pattern)):
+                                for filepath in Path(os.path.dirname(pattern)).rglob(
+                                    os.path.basename(pattern)
+                                ):
                                     if filepath.is_file():
-                                        futures.append(executor.submit(self.calculate_file_hash, str(filepath)))
+                                        futures.append(
+                                            executor.submit(
+                                                self.calculate_file_hash, str(filepath)
+                                            )
+                                        )
                             else:
                                 for filepath in glob.glob(pattern):
                                     if os.path.isfile(filepath):
-                                        futures.append(executor.submit(self.calculate_file_hash, filepath))
-                        
-                        for future, filepath in zip(concurrent.futures.as_completed(futures), files):
+                                        futures.append(
+                                            executor.submit(
+                                                self.calculate_file_hash, filepath
+                                            )
+                                        )
+
+                        for future, filepath in zip(
+                            concurrent.futures.as_completed(futures), files
+                        ):
                             try:
                                 hashes = future.result()
-                                self.format_output(filepath, hashes, kwargs.get('format', 'default'))
+                                self.format_output(
+                                    filepath, hashes, kwargs.get("format", "default")
+                                )
                                 # 写入哈希文件
                                 for algo, value in hashes.items():
                                     self.write_hash_file(filepath, value, algo)
                             except Exception as e:
                                 logging.error(f"处理文件 {filepath} 失败: {e}")
-                                if not self.config['file_handling']['ignore_errors']:
+                                if not self.config["file_handling"]["ignore_errors"]:
                                     raise
-        
+
         finally:
-            if self.config['output']['show_time']:
+            if self.config["output"]["show_time"]:
                 elapsed = time.time() - start_time
                 print(f"\n处理完成，耗时: {elapsed:.2f} 秒")
+
 
 def main():
     if len(sys.argv) < 2:
@@ -556,11 +637,11 @@ def main():
         print("hash -s file1 file2    比较两个或多个文件的哈希值")
         print("hash -a         无参数，自动验证当前目录下的哈希文件")
         return
-    
+
     try:
         calculator = HashCalculator()
         mode = sys.argv[1]
-        
+
         if mode == "-i":
             calculator.process_files(sys.argv[2:], mode="info")
         elif mode == "-s":
@@ -569,10 +650,11 @@ def main():
             calculator.process_files([], mode="auto_verify")
         else:
             print("错误：无效的操作模式，请使用 -i, -s 或 -a")
-            
+
     except Exception as e:
         print(f"执行过程中出错：{e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

@@ -5,6 +5,6 @@
 !README.md
 *.xlsx
 __pycache__/
+Blacken/
 !requirements.txt
-算法.py
 config.yaml
